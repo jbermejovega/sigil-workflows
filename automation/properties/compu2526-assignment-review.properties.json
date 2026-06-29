@@ -1,0 +1,8 @@
+{
+    "name": "COMPU2526 assignment review",
+    "description": "Build a reproducible review brief for Computational Physics student assignments.",
+    "iconName": "octicon checklist",
+    "creator": "jbermejovega",
+    "categories": ["Automation", "utilities", "code-review"],
+    "labels": ["preview"]
+}
