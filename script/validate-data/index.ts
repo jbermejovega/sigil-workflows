@@ -19,6 +19,93 @@ interface WorkflowProperties {
   categories: string[];
 }
 
+interface WorkflowStep {
+  name?: string;
+  uses?: string;
+  run?: string;
+}
+
+interface WorkflowJob {
+  steps?: WorkflowStep[];
+}
+
+interface WorkflowTemplate {
+  name?: string;
+  permissions?: { [key: string]: string };
+  jobs?: { [key: string]: WorkflowJob };
+}
+
+interface RequiredPermission {
+  key: string;
+  value: string;
+}
+
+interface WorkflowInvariant {
+  id: string;
+  workflowPath: string;
+  expectedWorkflowName: string;
+  expectedTemplateName: string;
+  requiredCategories: string[];
+  requiredPermission: RequiredPermission;
+  requiredUses: string[];
+  requiredStepNames: string[];
+  requiredRunFragments: string[];
+  forbiddenRunFragments: string[];
+}
+
+const workflowInvariants: WorkflowInvariant[] = [
+  {
+    id: "compu2526-review",
+    workflowPath: "../../ci/compu2526-review.yml",
+    expectedWorkflowName: "COMPU2526 review",
+    expectedTemplateName: "COMPU2526 assignment review",
+    requiredCategories: [
+      "Continuous integration",
+      "Python",
+      "C",
+      "C++",
+      "Jupyter Notebook",
+      "Education"
+    ],
+    requiredPermission: {
+      key: "contents",
+      value: "read"
+    },
+    requiredUses: [
+      "actions/checkout@v4",
+      "actions/setup-python@v5"
+    ],
+    requiredStepNames: [
+      "Checkout",
+      "Set up Python",
+      "Report repository manifests",
+      "Check Python syntax",
+      "Check C syntax",
+      "Check C++ syntax",
+      "Check notebooks",
+      "Print manual review gates"
+    ],
+    requiredRunFragments: [
+      "python -m py_compile",
+      "gcc -std=c11 -fsyntax-only",
+      "g++ -std=c++17 -fsyntax-only",
+      "json.load(handle)",
+      "Large notebook",
+      "Manual review still required",
+      "parameters and random seeds logged",
+      "units and rescaling documented",
+      "conserved quantities checked",
+      "generated data and media provenance clear"
+    ],
+    forbiddenRunFragments: [
+      "pytest",
+      "make check",
+      "make distcheck",
+      "jupyter nbconvert --execute"
+    ]
+  }
+];
+
 const propertiesSchema = {
   type: "object",
   properties: {
@@ -39,6 +126,103 @@ const propertiesSchema = {
       required: true
     },
   }
+}
+
+function normalizedPath(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
+function allSteps(workflow: WorkflowTemplate): WorkflowStep[] {
+  if (!workflow.jobs) {
+    return [];
+  }
+
+  const steps: WorkflowStep[] = [];
+  Object.keys(workflow.jobs).forEach(jobName => {
+    const job = workflow.jobs[jobName];
+    if (job && Array.isArray(job.steps)) {
+      job.steps.forEach(step => steps.push(step));
+    }
+  });
+  return steps;
+}
+
+function runText(steps: WorkflowStep[]): string {
+  return steps
+    .map(step => step.run || "")
+    .join("\n");
+}
+
+function usesValues(steps: WorkflowStep[]): string[] {
+  return steps
+    .map(step => step.uses)
+    .filter(uses => !!uses) as string[];
+}
+
+function checkWorkflowInvariants(
+  workflowPath: string,
+  workflow: WorkflowTemplate,
+  properties: WorkflowProperties
+): string[] {
+  const invariant = workflowInvariants.find(candidate =>
+    normalizedPath(workflowPath) == normalizedPath(candidate.workflowPath)
+  );
+  if (!invariant) {
+    return [];
+  }
+
+  const errors: string[] = [];
+  const steps = allSteps(workflow);
+  const names = steps.map(step => step.name || "");
+  const runs = runText(steps);
+  const uses = usesValues(steps);
+
+  if (workflow.name != invariant.expectedWorkflowName) {
+    errors.push(`Invariant ${invariant.id}: workflow name must be "${invariant.expectedWorkflowName}"`);
+  }
+
+  if (properties.name != invariant.expectedTemplateName) {
+    errors.push(`Invariant ${invariant.id}: properties name must be "${invariant.expectedTemplateName}"`);
+  }
+
+  const permissionValue = workflow.permissions && workflow.permissions[invariant.requiredPermission.key];
+  if (permissionValue != invariant.requiredPermission.value) {
+    errors.push(
+      `Invariant ${invariant.id}: permission ${invariant.requiredPermission.key} must be ${invariant.requiredPermission.value}`
+    );
+  }
+
+  invariant.requiredCategories.forEach(category => {
+    if (!properties.categories || properties.categories.indexOf(category) == -1) {
+      errors.push(`Invariant ${invariant.id}: missing category "${category}"`);
+    }
+  });
+
+  invariant.requiredUses.forEach(requiredUse => {
+    if (uses.indexOf(requiredUse) == -1) {
+      errors.push(`Invariant ${invariant.id}: missing action use "${requiredUse}"`);
+    }
+  });
+
+  invariant.requiredStepNames.forEach(stepName => {
+    if (names.indexOf(stepName) == -1) {
+      errors.push(`Invariant ${invariant.id}: missing step "${stepName}"`);
+    }
+  });
+
+  invariant.requiredRunFragments.forEach(fragment => {
+    if (runs.indexOf(fragment) == -1) {
+      errors.push(`Invariant ${invariant.id}: missing run fragment "${fragment}"`);
+    }
+  });
+
+  invariant.forbiddenRunFragments.forEach(fragment => {
+    if (runs.indexOf(fragment) != -1) {
+      errors.push(`Invariant ${invariant.id}: forbidden run fragment "${fragment}"`);
+    }
+  });
+
+  return errors;
 }
 
 async function checkWorkflows(folders: string[], allowed_categories: object[]): Promise<WorkflowWithErrors[]> {
@@ -78,7 +262,7 @@ async function checkWorkflow(workflowPath: string, propertiesPath: string, allow
   }
   try {
     const workflowFileContent = await fs.readFile(workflowPath, "utf8");
-    safeLoad(workflowFileContent); // Validate yaml parses without error
+    const workflow = safeLoad(workflowFileContent) as WorkflowTemplate; // Validate yaml parses without error
 
     const propertiesFileContent = await fs.readFile(propertiesPath, "utf8")
     const properties: WorkflowProperties = JSON.parse(propertiesFileContent)
@@ -119,6 +303,10 @@ async function checkWorkflow(workflowPath: string, propertiesPath: string, allow
     if(basename(path).toLowerCase() == 'deployments' && !properties.creator) {
       workflowErrors.errors.push(`The "creator" in properties.json must be present.`)
     }
+
+    workflowErrors.errors = workflowErrors.errors.concat(
+      checkWorkflowInvariants(workflowPath, workflow, properties)
+    )
   } catch (e) {
     workflowErrors.errors.push(e.toString())
   }
@@ -133,14 +321,14 @@ async function checkWorkflow(workflowPath: string, propertiesPath: string, allow
     )
 
     if (erroredWorkflows.length > 0) {
-      startGroup(`😟 - Found ${erroredWorkflows.length} workflows with errors:`);
+      startGroup(`Found ${erroredWorkflows.length} workflows with errors:`);
       erroredWorkflows.forEach(erroredWorkflow => {
         error(`Errors in ${erroredWorkflow.id} - ${erroredWorkflow.errors.map(e => e.toString()).join(", ")}`)
       })
       endGroup();
       setFailed(`Found ${erroredWorkflows.length} workflows with errors`);
     } else {
-      info("🎉🤘 - Found no workflows with errors!")
+      info("Found no workflows with errors!")
     }
   } catch (e) {
     error(`Unhandled error while syncing workflows: ${e}`);
