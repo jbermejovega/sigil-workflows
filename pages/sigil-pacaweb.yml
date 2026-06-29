@@ -1,0 +1,78 @@
+# Deploy a SIGIL/PACA-generated static web surface to GitHub Pages.
+name: Deploy SIGIL PACAWEB to Pages
+
+on:
+  push:
+    branches: [$default-branch]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build PACAWEB artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build or collect PACAWEB
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          out_dir="build/pacaweb-deploy"
+          rm -rf "$out_dir"
+          mkdir -p "$out_dir"
+
+          if [ -f scripts/pacaweb_build.sh ]; then
+            bash scripts/pacaweb_build.sh "$PWD" "$PWD/$out_dir"
+          elif [ -f pacaweb/index.html ]; then
+            cp -R pacaweb/. "$out_dir/"
+          elif [ -f public/index.html ]; then
+            cp -R public/. "$out_dir/"
+          else
+            echo "::error title=PACAWEB source missing::Add scripts/pacaweb_build.sh, pacaweb/index.html, or public/index.html before using this starter workflow."
+            exit 1
+          fi
+
+          touch "$out_dir/.nojekyll"
+          test -f "$out_dir/index.html"
+
+          if [ -f "$out_dir/deploy-manifest.json" ]; then
+            python -m json.tool "$out_dir/deploy-manifest.json" >/dev/null
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/pacaweb-deploy
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

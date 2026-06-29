@@ -1,0 +1,7 @@
+{
+    "name": "SIGIL PACAWEB",
+    "description": "Build or collect a SIGIL/PACA static web surface and deploy it with GitHub Pages.",
+    "iconName": "octicon workflow",
+    "creator": "jbermejovega",
+    "categories": ["Pages", "deployment", "automation", "utilities", "HTML", "JavaScript", "CSS"]
+}
