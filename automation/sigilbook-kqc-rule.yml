@@ -1,0 +1,143 @@
+# This workflow validates SIGILBOOK KQC rule files for public sharing.
+
+name: SIGILBOOK KQC rule
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+  workflow_dispatch:
+    inputs:
+      rule_path:
+        description: "Optional path to a SIGILBOOK KQC rule file"
+        default: "sigilbook/kqc-rule.json"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Validate SIGILBOOK KQC rule
+      shell: bash
+      run: |
+        set -euo pipefail
+        python - <<'PY'
+        import json
+        import os
+        import re
+        from pathlib import Path
+
+        REQUIRED = {
+            "rule_id",
+            "rule_type",
+            "status",
+            "applies_to",
+            "boundary",
+            "checks",
+            "renormalization_flow",
+        }
+
+        FLOW_REQUIRED = {
+            "source_scale",
+            "target_scale",
+            "operators",
+            "invariants",
+            "fixed_points",
+            "halt_condition",
+        }
+
+        candidates = []
+        requested = os.environ.get("INPUT_RULE_PATH", "").strip()
+        if requested:
+            candidates.append(Path(requested))
+
+        roots = [Path("sigilbook"), Path("rules"), Path(".")]
+        names = {"kqc-rule.json", "kqc-rule.yml", "kqc-rule.yaml"}
+        for root in roots:
+            if root.exists():
+                for path in root.rglob("*"):
+                    if path.is_file() and path.name in names:
+                        candidates.append(path)
+
+        seen = []
+        for path in candidates:
+            if path not in seen:
+                seen.append(path)
+
+        existing = [path for path in seen if path.exists()]
+        if not existing:
+            raise SystemExit("No SIGILBOOK KQC rule file found. Expected sigilbook/kqc-rule.json, .yml, or .yaml.")
+
+        def json_rule(path):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise SystemExit(f"{path} must contain a JSON object.")
+            return data, False
+
+        def simple_yaml_rule(path):
+            data = {}
+            current_top = None
+            for raw in path.read_text(encoding="utf-8").splitlines():
+                line = raw.split("#", 1)[0].rstrip()
+                if not line.strip():
+                    continue
+
+                top = re.match(r"^([A-Za-z0-9_-]+):(?:\s*(.*))?$", line)
+                if top:
+                    current_top = top.group(1)
+                    inline = top.group(2) or ""
+                    data.setdefault(current_top, {})
+                    if current_top == "renormalization_flow":
+                        for key in FLOW_REQUIRED:
+                            if re.search(rf"(?<![A-Za-z0-9_-]){re.escape(key)}\s*:", inline):
+                                data[current_top][key] = True
+                    continue
+
+                nested = re.match(r"^\s+([A-Za-z0-9_-]+):", line)
+                if current_top == "renormalization_flow" and nested:
+                    data[current_top][nested.group(1)] = True
+            return data, True
+
+        def require_nonempty(path, flow, key):
+            value = flow.get(key)
+            if value is None or value == "" or value == [] or value == {}:
+                raise SystemExit(f"{path} renormalization_flow.{key} must be present and non-empty.")
+
+        def validate_rule(path, data, shallow):
+            missing = sorted(REQUIRED - set(data.keys()))
+            if missing:
+                raise SystemExit(f"{path} missing required KQC fields: {', '.join(missing)}")
+
+            flow = data.get("renormalization_flow")
+            if not isinstance(flow, dict):
+                raise SystemExit(f"{path} renormalization_flow must be an object/map.")
+
+            missing_flow = sorted(FLOW_REQUIRED - set(flow.keys()))
+            if missing_flow:
+                raise SystemExit(f"{path} missing renormalization_flow fields: {', '.join(missing_flow)}")
+
+            if not shallow:
+                for key in sorted(FLOW_REQUIRED):
+                    require_nonempty(path, flow, key)
+
+        for path in existing:
+            suffix = path.suffix.lower()
+            rule, shallow = json_rule(path) if suffix == ".json" else simple_yaml_rule(path)
+            validate_rule(path, rule, shallow)
+            print(f"ok {path} kqc fields + renormalization flow")
+        PY
+      env:
+        INPUT_RULE_PATH: ${{ inputs.rule_path || '' }}
