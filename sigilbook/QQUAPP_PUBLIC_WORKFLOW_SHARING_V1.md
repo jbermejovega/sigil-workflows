@@ -72,6 +72,42 @@ kqc_public_sharing_rule:
   developer_can_review_before_merge: true
 ```
 
+## KQC Workflow Invariant Rule: COMPU2526
+
+`COMPU2526_ASSIGNMENT_REVIEW_INVARIANT_V1` binds the computational physics
+assignment review starter workflow to the SigilBook public sharing rule.
+
+```yaml
+kqc_workflow_invariant_rules:
+  - id: COMPU2526_ASSIGNMENT_REVIEW_INVARIANT_V1
+    workflow_template: ci/compu2526-review.yml
+    metadata_template: ci/properties/compu2526-review.properties.json
+    public_sharing_admissible: true
+    pull_request_review_required: true
+    least_privilege_permissions:
+      contents: read
+    required_actions:
+      - actions/checkout@v4
+      - actions/setup-python@v5
+    required_review_gates:
+      - repository_manifest_report
+      - python_syntax_py_compile
+      - c_syntax_fsyntax_only
+      - cpp_syntax_fsyntax_only
+      - notebook_json_parse
+      - large_notebook_warning
+      - manual_science_review_trace
+    forbidden_default_operations:
+      - pytest
+      - make check
+      - make distcheck
+      - jupyter nbconvert --execute
+```
+
+The rule preserves review safety: the workflow may smoke-check source and
+notebook structure, but it must not turn expensive simulations, notebook
+execution, package tests, or Make targets into default public review transport.
+
 Rejected operations:
 
 ```yaml
@@ -84,6 +120,7 @@ rejected_operations:
   - identity_transport
   - unreviewed_workflow_installation
   - branch_topology_as_authority
+  - expensive_simulation_as_default_review_gate
 ```
 
 ## Developer PR Contract
@@ -105,4 +142,5 @@ QQUAPP chains.
 Developers review.
 KQC gates.
 No force move transport.
+Typed invariants preserve review shape.
 ```
