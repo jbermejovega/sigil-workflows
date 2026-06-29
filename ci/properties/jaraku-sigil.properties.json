@@ -1,0 +1,7 @@
+{
+  "name": "Jaraku SIGIL",
+  "description": "Validate a SIGIL/Jaraku project with Python carrier tests, JSON contracts, and Godot addon checks.",
+  "iconName": "octicon workflow",
+  "creator": "qquapp",
+  "categories": ["continuous-integration", "testing", "code-quality", "Python", "Game Development"]
+}

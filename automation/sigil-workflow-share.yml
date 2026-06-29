@@ -1,0 +1,49 @@
+# This workflow packages SIGIL workflow templates for public review or sharing.
+
+name: SIGIL workflow share
+
+on:
+  workflow_dispatch:
+    inputs:
+      package_name:
+        description: "Name for the generated workflow package"
+        default: "sigil-workflows-share"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build workflow package
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p "${{ inputs.package_name }}"
+
+        for dir in ci automation code-scanning pages; do
+          if [ -d "$dir" ]; then
+            mkdir -p "${{ inputs.package_name }}/$dir"
+            find "$dir" -maxdepth 2 \( -name "*.yml" -o -name "*.yaml" -o -name "*.properties.json" \) -print -exec cp --parents {} "${{ inputs.package_name }}" \;
+          fi
+        done
+
+        {
+          echo "# SIGIL workflow share"
+          echo
+          echo "Generated from: $GITHUB_REPOSITORY"
+          echo "Commit: $GITHUB_SHA"
+          echo "Run: $GITHUB_RUN_ID"
+        } > "${{ inputs.package_name }}/README.md"
+
+    - name: Upload workflow package
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.package_name }}
+        path: ${{ inputs.package_name }}

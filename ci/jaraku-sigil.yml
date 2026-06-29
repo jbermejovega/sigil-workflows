@@ -1,0 +1,81 @@
+# This workflow validates a SIGIL/Jaraku project with Python carrier tests,
+# JSON contract checks, and Godot addon static checks.
+
+name: Jaraku SIGIL
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Run Python carrier tests
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -d "python/tests" ]; then
+          cd python
+          python -m unittest discover -s tests
+        else
+          echo "No python/tests directory found; skipping Python carrier tests."
+        fi
+
+    - name: Validate JSON contracts
+      shell: bash
+      run: |
+        set -euo pipefail
+        python - <<'PY'
+        import json
+        from pathlib import Path
+
+        roots = [Path("manifest.json"), Path("n8n"), Path("benite"), Path("godot"), Path("python/release")]
+        files = []
+        for root in roots:
+            if root.is_file() and root.suffix == ".json":
+                files.append(root)
+            elif root.is_dir():
+                files.extend(root.rglob("*.json"))
+
+        for path in files:
+            json.loads(path.read_text(encoding="utf-8"))
+            print(f"ok {path}")
+        PY
+
+    - name: Check generated cache files are absent
+      shell: bash
+      run: |
+        set -euo pipefail
+        if find . -type d -name "__pycache__" | grep -q .; then
+          echo "__pycache__ directories must not be committed."
+          find . -type d -name "__pycache__"
+          exit 1
+        fi
+
+    - name: Static check Godot addon scripts
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -d "addons/jaraku_sigil" ]; then
+          test -f addons/jaraku_sigil/plugin.cfg
+          test -f addons/jaraku_sigil/jaraku_rule_engine.gd
+          test -f addons/jaraku_sigil/llm_oracle_bridge.gd
+          grep -R "class_name JarakuRuleEngine" addons/jaraku_sigil
+          grep -R "class_name JarakuLlmOracleBridge" addons/jaraku_sigil
+        else
+          echo "No addons/jaraku_sigil directory found; skipping Godot addon checks."
+        fi
