@@ -1,0 +1,11 @@
+{
+  "name": "SIGIL KQC Public Workflow Sharing",
+  "description": "Validate a replay-safe QQUAPP exact chain from sigilbook to public developer PR sharing before a workflow is shared.",
+  "iconName": "octicon workflow",
+  "creator": "JJBV SIGILBOOK",
+  "categories": [
+    "Automation",
+    "code-review",
+    "utilities"
+  ]
+}
