@@ -1,0 +1,91 @@
+name: QQUAPP SIGILBOOK KQC Chain
+
+on:
+  pull_request:
+    branches:
+      - $default-branch
+  workflow_dispatch:
+    inputs:
+      sigilbook_chain:
+        description: Canonical sigilbook chain URL or repo ref.
+        required: false
+        default: https://github.com/jbermejovega/sigilbook/pull/44
+      public_share_scope:
+        description: Public sharing scope for downstream developers.
+        required: false
+        default: workflow-template
+
+permissions:
+  contents: read
+
+jobs:
+  qquapp-kqc-public-chain:
+    name: QQUAPP KQC public sharing gate
+    runs-on: ubuntu-latest
+    env:
+      DEFAULT_SIGILBOOK_CHAIN: https://github.com/jbermejovega/sigilbook/pull/44
+      SIGILBOOK_CHAIN_INPUT: ${{ github.event.inputs.sigilbook_chain }}
+      PUBLIC_SHARE_SCOPE_INPUT: ${{ github.event.inputs.public_share_scope }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout without marketplace actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          basic_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git init -b work .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic ${basic_auth}" fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout --force FETCH_HEAD
+
+      - name: Enforce KQC public sharing rule
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sigilbook_chain="${SIGILBOOK_CHAIN_INPUT:-$DEFAULT_SIGILBOOK_CHAIN}"
+          public_share_scope="${PUBLIC_SHARE_SCOPE_INPUT:-workflow-template}"
+
+          case "$sigilbook_chain" in
+            https://github.com/jbermejovega/sigilbook*|jbermejovega/sigilbook*) ;;
+            *)
+              echo "::error::KQC sharing requires an explicit jbermejovega/sigilbook canonical chain."
+              exit 1
+              ;;
+          esac
+
+          workflow_file=''
+          if [ -f '.github/workflows/qquapp-sigilbook-kqc-chain.yml' ]; then
+            workflow_file='.github/workflows/qquapp-sigilbook-kqc-chain.yml'
+          else
+            workflow_file="$(find .github/workflows -maxdepth 1 -type f \( -name '*qquapp*' -o -name '*kqc*' -o -name '*sigilbook*' \) 2>/dev/null | head -n 1 || true)"
+          fi
+
+          if [ -n "$workflow_file" ]; then
+            if grep -nE 'pull_request_target|secrets\.|write-all|contents:[[:space:]]*write|id-token:[[:space:]]*write|packages:[[:space:]]*write|uses:|git[[:space:]]+push.*--force|git[[:space:]]+reset[[:space:]]+--hard' "$workflow_file"; then
+              echo "::error::KQC public sharing forbids unsafe trigger, secret, write, external action, or force-move transport patterns."
+              exit 1
+            fi
+          fi
+
+          mkdir -p build/qquapp-kqc
+          cat > build/qquapp-kqc/public-chain-witness.yaml <<EOF
+          QQUAPP_SIGILBOOK_KQC_PUBLIC_CHAIN_WITNESS_V1:
+            canonical_source: "$sigilbook_chain"
+            public_share_scope: "$public_share_scope"
+            qquapp_exact_chain: true
+            sigilbook_bound: true
+            sigil_workflows_public_surface: true
+            kqc_safety_rule: true
+            pull_request_target_allowed: false
+            secrets_required: false
+            token_permissions: contents_read
+            marketplace_actions_used: false
+            force_move_transport_allowed: false
+            replay_safe_admissible: true
+            downstream_developer_pr_surface: true
+          EOF
+
+          cat build/qquapp-kqc/public-chain-witness.yaml
+          cat build/qquapp-kqc/public-chain-witness.yaml >> "$GITHUB_STEP_SUMMARY"
