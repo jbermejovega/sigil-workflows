@@ -1,0 +1,59 @@
+id: QQUAPP_SIGILBOOK_KQC_PUBLIC_CHAIN_V1
+status:
+  canonical: true
+  public_preview: true
+  replay_safe: true
+  kqc_safety_rule: true
+  no_force_move_transport: true
+  no_secret_dependency: true
+  read_only_permissions: true
+
+canonical_source:
+  repo: jbermejovega/sigilbook
+  pull_request: 44
+  branch: codex/global-plural-mcp-workflow
+  workflow: .github/workflows/mcp-django-uap-workflow.yml
+  canary: .github/workflows/actions-startup-canary.yml
+  registry: src/jjbvapiofapiapi/sigilapiTypeScriptPresheaf.ts
+  sigilapi_index: INDEX_SIGILAPI.md
+
+public_surface:
+  repo: jbermejovega/sigil-workflows
+  starter_workflow: automation/qquapp-sigilbook-kqc-chain.yml
+  starter_metadata: automation/properties/qquapp-sigilbook-kqc-chain.properties.json
+  public_pr_mode: draft_review
+  downstream_developer_surface: github_actions_starter_workflow
+
+qquapp_exact_chain:
+  - sigilbook:PACATERMINAL_MCP_DJANGO_UAP_WORKFLOW_V1
+  - sigilbook:SIGILAPI_TYPESCRIPT_QQUAPP_PRESHEAF_INJECTION_V1
+  - sigilbook:RULEZERO_CONTEXTUAL_GLUE_QQUAPP_QUASARPI_V1
+  - sigil-workflows:QQUAPP_SIGILBOOK_KQC_PUBLIC_CHAIN_V1
+
+kqc_safety_rule:
+  public_sharing_is_admissible_when:
+    - canonical_sigilbook_chain_is_declared
+    - workflow_uses_pull_request_or_workflow_dispatch_only
+    - workflow_never_uses_pull_request_target
+    - token_permissions_are_contents_read
+    - secrets_are_not_required
+    - marketplace_actions_are_not_required
+    - force_move_transport_is_rejected
+    - witness_is_written_to_step_summary
+  public_sharing_is_rejected_when:
+    - canonical_sigilbook_chain_is_missing
+    - secrets_or_write_tokens_are_required
+    - pull_request_target_is_used
+    - force_push_or_hard_reset_transport_is_declared
+    - external_action_dependency_is_required_for_startup
+
+markers:
+  - QQUAPP
+  - SIGILBOOK
+  - SIGILAPI
+  - PACATERMINAL
+  - KQC
+  - public_workflow_integration
+  - downstream_developer_pr_surface
+  - replay_safe_admissible
+  - no_force_move_transport

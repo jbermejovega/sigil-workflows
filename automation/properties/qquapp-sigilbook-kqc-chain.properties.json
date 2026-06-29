@@ -1,0 +1,15 @@
+{
+  "name": "QQUAPP SIGILBOOK KQC Chain",
+  "description": "Publish a read-only KQC-safe QQUAPP workflow chain bound to the canonical jbermejovega/sigilbook SIGILAPI/PACATERMINAL workflow.",
+  "iconName": "octicon shield-check",
+  "creator": "jbermejovega",
+  "categories": [
+    "Automation",
+    "utilities",
+    "code-quality",
+    "continuous-integration"
+  ],
+  "labels": [
+    "preview"
+  ]
+}
