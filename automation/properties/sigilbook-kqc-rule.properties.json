@@ -1,0 +1,7 @@
+{
+  "name": "SIGILBOOK KQC rule",
+  "description": "Validate SIGILBOOK KQC rule files before public workflow sharing.",
+  "iconName": "octicon book",
+  "creator": "qquapp",
+  "categories": ["Automation", "utilities", "code-quality"]
+}
