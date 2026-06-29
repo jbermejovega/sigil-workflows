@@ -1,0 +1,99 @@
+# This workflow validates SIGILBOOK KQC rule files for public sharing.
+
+name: SIGILBOOK KQC rule
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+  workflow_dispatch:
+    inputs:
+      rule_path:
+        description: "Optional path to a SIGILBOOK KQC rule file"
+        default: "sigilbook/kqc-rule.json"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Validate SIGILBOOK KQC rule
+      shell: bash
+      run: |
+        set -euo pipefail
+        python - <<'PY'
+        import json
+        import os
+        import re
+        from pathlib import Path
+
+        required = {
+            "rule_id",
+            "rule_type",
+            "status",
+            "applies_to",
+            "boundary",
+            "checks",
+        }
+
+        candidates = []
+        requested = os.environ.get("INPUT_RULE_PATH", "").strip()
+        if requested:
+            candidates.append(Path(requested))
+
+        roots = [Path("sigilbook"), Path("rules"), Path(".")]
+        names = {"kqc-rule.json", "kqc-rule.yml", "kqc-rule.yaml"}
+        for root in roots:
+            if root.exists():
+                for path in root.rglob("*"):
+                    if path.is_file() and path.name in names:
+                        candidates.append(path)
+
+        seen = []
+        for path in candidates:
+            if path not in seen:
+                seen.append(path)
+
+        existing = [path for path in seen if path.exists()]
+        if not existing:
+            raise SystemExit("No SIGILBOOK KQC rule file found. Expected sigilbook/kqc-rule.json, .yml, or .yaml.")
+
+        def json_keys(path):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise SystemExit(f"{path} must contain a JSON object.")
+            return set(data.keys())
+
+        def simple_yaml_keys(path):
+            keys = set()
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip() or line.lstrip().startswith("#"):
+                    continue
+                match = re.match(r"^([A-Za-z0-9_-]+):", line)
+                if match:
+                    keys.add(match.group(1))
+            return keys
+
+        for path in existing:
+            suffix = path.suffix.lower()
+            keys = json_keys(path) if suffix == ".json" else simple_yaml_keys(path)
+            missing = sorted(required - keys)
+            if missing:
+                raise SystemExit(f"{path} missing required KQC fields: {', '.join(missing)}")
+            print(f"ok {path}")
+        PY
+      env:
+        INPUT_RULE_PATH: ${{ inputs.rule_path || '' }}
