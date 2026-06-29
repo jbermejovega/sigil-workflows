@@ -42,6 +42,43 @@
     "qquapp_exact_chain_declared": true,
     "developer_can_review_before_merge": true
   },
+  "kqc_workflow_invariant_rules": [
+    {
+      "id": "COMPU2526_ASSIGNMENT_REVIEW_INVARIANT_V1",
+      "workflow_template": "ci/compu2526-review.yml",
+      "metadata_template": "ci/properties/compu2526-review.properties.json",
+      "public_sharing_admissible": true,
+      "pull_request_review_required": true,
+      "least_privilege_permissions": {
+        "contents": "read"
+      },
+      "required_actions": [
+        "actions/checkout@v4",
+        "actions/setup-python@v5"
+      ],
+      "required_review_gates": [
+        "repository_manifest_report",
+        "python_syntax_py_compile",
+        "c_syntax_fsyntax_only",
+        "cpp_syntax_fsyntax_only",
+        "notebook_json_parse",
+        "large_notebook_warning",
+        "manual_science_review_trace"
+      ],
+      "required_manual_review_terms": [
+        "parameters and random seeds logged",
+        "units and rescaling documented",
+        "conserved quantities checked",
+        "generated data and media provenance clear"
+      ],
+      "forbidden_default_operations": [
+        "pytest",
+        "make check",
+        "make distcheck",
+        "jupyter nbconvert --execute"
+      ]
+    }
+  ],
   "typed_flow": [
     "QUNO",
     "SIGIL",
@@ -57,7 +94,8 @@
     "propose_pull_request",
     "review_pull_request",
     "replay_status_trace",
-    "certify_kqc_public_sharing"
+    "certify_kqc_public_sharing",
+    "certify_workflow_invariant"
   ],
   "rejected_operations": [
     "force_push_as_release",
@@ -67,7 +105,8 @@
     "direct_upstream_mutation",
     "identity_transport",
     "unreviewed_workflow_installation",
-    "branch_topology_as_authority"
+    "branch_topology_as_authority",
+    "expensive_simulation_as_default_review_gate"
   ],
   "forbidden_payload_tokens": [
     "password",
