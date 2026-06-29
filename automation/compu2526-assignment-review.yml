@@ -1,0 +1,118 @@
+# Build a reproducible review brief for a COMPU2526 student assignment.
+
+name: COMPU2526 assignment review
+
+on:
+  workflow_dispatch:
+    inputs:
+      student_name:
+        description: Student display name.
+        required: true
+        type: string
+      student_repo:
+        description: Student GitHub repository in owner/name form.
+        required: true
+        type: string
+      assignment:
+        description: Assignment or voluntary block under review.
+        required: true
+        type: choice
+        options:
+          - obligatorio-1-sistema-solar
+          - obligatorio-2-ising
+          - obligatorio-3-schrodinger
+          - obligatorio-4-cohete
+          - voluntario-1
+          - voluntario-2
+          - full-repository
+      review_state:
+        description: Current review state in the assignment HyperDAG.
+        required: true
+        default: discovered
+        type: choice
+        options:
+          - discovered
+          - glued
+          - evidence-indexed
+          - content-review
+          - scored
+          - ranked
+          - blocked
+      evidence_root:
+        description: Optional path or URL where the evidence starts.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  review-brief:
+    name: Build assignment review brief
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Build review brief
+        shell: bash
+        env:
+          STUDENT_NAME: ${{ inputs.student_name }}
+          STUDENT_REPO: ${{ inputs.student_repo }}
+          ASSIGNMENT: ${{ inputs.assignment }}
+          REVIEW_STATE: ${{ inputs.review_state }}
+          EVIDENCE_ROOT: ${{ inputs.evidence_root }}
+        run: |
+          set -euo pipefail
+
+          cat > compu2526-assignment-review.md <<EOF
+          # COMPU2526 assignment review brief
+
+          ## Identity
+
+          - Student: ${STUDENT_NAME}
+          - Repository: ${STUDENT_REPO}
+          - Assignment: ${ASSIGNMENT}
+          - Review state: ${REVIEW_STATE}
+          - Evidence root: ${EVIDENCE_ROOT:-not provided}
+
+          ## Review contract
+
+          A numerical result is reviewable only when the following tuple is visible:
+
+          - method stated
+          - parameters stated
+          - units stated
+          - code or path replayable
+          - output traceable
+
+          ## Assignment checks
+
+          - [ ] Evidence is mapped to the teacher standard.
+          - [ ] Notebook or report is present.
+          - [ ] Code path is identifiable.
+          - [ ] Parameters and units are stated.
+          - [ ] Numerical outputs are traceable.
+          - [ ] Figures or tables support the interpretation.
+          - [ ] Reproducibility status is recorded.
+          - [ ] Missing evidence is explicitly listed.
+
+          ## Typed review state
+
+          Use the state machine below consistently across students:
+
+          - discovered: repo or PRADO evidence exists, not yet glued.
+          - glued: repo has a typed subgraph connected to the teacher standard.
+          - evidence-indexed: notebooks, scripts, data, figures, outputs, and missing evidence are recorded.
+          - content-review: scientific and computational content is being inspected.
+          - scored: rubric score and justification are written.
+          - ranked: student is ordered relative to the same call.
+          - blocked: review needs missing evidence or policy clarification.
+          EOF
+
+          cat compu2526-assignment-review.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload review brief
+        uses: actions/upload-artifact@v4
+        with:
+          name: compu2526-assignment-review
+          path: compu2526-assignment-review.md
