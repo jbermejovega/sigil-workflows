@@ -1,0 +1,7 @@
+{
+  "name": "SIGIL workflow share",
+  "description": "Package starter workflow templates for public sharing and developer review.",
+  "iconName": "octicon share",
+  "creator": "qquapp",
+  "categories": ["Automation", "utilities"]
+}
