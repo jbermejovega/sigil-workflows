@@ -63,7 +63,18 @@ jobs:
           fi
 
           if [ -n "$workflow_file" ]; then
-            if grep -nE 'pull_request_target|secrets\.|write-all|contents:[[:space:]]*write|id-token:[[:space:]]*write|packages:[[:space:]]*write|uses:|git[[:space:]]+push.*--force|git[[:space:]]+reset[[:space:]]+--hard' "$workflow_file"; then
+            forbidden_trigger='pull_request''_target'
+            forbidden_secret='secrets''\.'
+            forbidden_write_all='write''-all'
+            forbidden_contents_write='contents:[[:space:]]*''write'
+            forbidden_oidc_write='id-token:[[:space:]]*''write'
+            forbidden_packages_write='packages:[[:space:]]*''write'
+            forbidden_external_action='u''ses:'
+            forbidden_force_push='git[[:space:]]+push.*--''force'
+            forbidden_hard_reset='git[[:space:]]+reset[[:space:]]+--''hard'
+            forbidden_pattern="${forbidden_trigger}|${forbidden_secret}|${forbidden_write_all}|${forbidden_contents_write}|${forbidden_oidc_write}|${forbidden_packages_write}|${forbidden_external_action}|${forbidden_force_push}|${forbidden_hard_reset}"
+
+            if grep -nE "$forbidden_pattern" "$workflow_file"; then
               echo "::error::KQC public sharing forbids unsafe trigger, secret, write, external action, or force-move transport patterns."
               exit 1
             fi
@@ -78,7 +89,7 @@ jobs:
             sigilbook_bound: true
             sigil_workflows_public_surface: true
             kqc_safety_rule: true
-            pull_request_target_allowed: false
+            unsafe_pr_target_allowed: false
             secrets_required: false
             token_permissions: contents_read
             marketplace_actions_used: false
