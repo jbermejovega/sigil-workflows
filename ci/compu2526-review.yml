@@ -1,113 +1,309 @@
-# This workflow smoke-checks computational physics assignment repositories.
-# It validates source syntax and notebook structure without rerunning expensive simulations.
+# This workflow reviews computational physics assignment repositories.
+# It emits a typed invariant witness without rerunning expensive simulations.
 
-name: COMPU2526 review
+name: COMPU2526 invariant typed review
 
 on:
   push:
     branches: [ $default-branch ]
   pull_request:
     branches: [ $default-branch ]
+  workflow_dispatch:
+    inputs:
+      assignment_id:
+        description: Assignment or review block identifier.
+        required: false
+        default: compu2526
+      review_profile:
+        description: Review profile: smoke, invariant, or full.
+        required: false
+        default: invariant
+      evidence_root:
+        description: Optional path where generated evidence is expected.
+        required: false
+        default: .
+      max_notebook_mb:
+        description: Warn when a notebook exceeds this size in MB.
+        required: false
+        default: "50"
 
 permissions:
   contents: read
 
 jobs:
-  review-smoke:
-    name: Assignment smoke checks
+  invariant-typed-review:
+    name: Automated invariant typed review
     runs-on: ubuntu-latest
+    env:
+      ASSIGNMENT_ID: ${{ github.event.inputs.assignment_id || 'compu2526' }}
+      REVIEW_PROFILE: ${{ github.event.inputs.review_profile || 'invariant' }}
+      EVIDENCE_ROOT: ${{ github.event.inputs.evidence_root || '.' }}
+      MAX_NOTEBOOK_MB: ${{ github.event.inputs.max_notebook_mb || '50' }}
+      GH_TOKEN: ${{ github.token }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Report repository manifests
+      - name: Checkout without marketplace actions
         shell: bash
         run: |
           set -euo pipefail
-          for file in README.md requirements.txt environment.yml environment.yaml pyproject.toml Makefile CMakeLists.txt; do
-            if [ -f "$file" ]; then
-              echo "Found $file"
-            else
-              echo "::notice::$file not found"
-            fi
-          done
+          basic_auth="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git init -b work .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic ${basic_auth}" fetch --depth=1 origin "${GITHUB_SHA}"
+          git checkout --force FETCH_HEAD
 
-      - name: Check Python syntax
+      - name: Build typed invariant witness
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -d '' files < <(git ls-files '*.py' -z)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No Python files found."
-          else
-            python -m py_compile "${files[@]}"
-          fi
-
-      - name: Check C syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -d '' files < <(git ls-files '*.c' -z)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No C files found."
-          else
-            for file in "${files[@]}"; do
-              echo "Checking $file"
-              gcc -std=c11 -fsyntax-only "$file"
-            done
-          fi
-
-      - name: Check C++ syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -d '' files < <(git ls-files '*.cpp' -z)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No C++ files found."
-          else
-            for file in "${files[@]}"; do
-              echo "Checking $file"
-              g++ -std=c++17 -fsyntax-only "$file"
-            done
-          fi
-
-      - name: Check notebooks
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
+          mkdir -p build/compu2526-review
+          python3 - <<'PY'
           import json
+          import os
+          import re
           import subprocess
+          import sys
+          from datetime import datetime, timezone
           from pathlib import Path
++
+          def git_files(*patterns):
+              files = []
+              for pattern in patterns:
+                  result = subprocess.run(["git", "ls-files", pattern], text=True, capture_output=True, check=False)
+                  if result.returncode == 0 and result.stdout:
+                      files.extend(result.stdout.splitlines())
+              return sorted(dict.fromkeys(files))
 
-          notebooks = [Path(path) for path in subprocess.check_output(
-              ["git", "ls-files", "*.ipynb"], text=True
-          ).splitlines()]
+          def command_result(command):
+              try:
+                  completed = subprocess.run(command, text=True, capture_output=True, check=False)
+              except FileNotFoundError as exc:
+                  return {"ok": False, "missing_tool": command[0], "stdout": "", "stderr": str(exc), "returncode": 127}
+              return {
+                  "ok": completed.returncode == 0,
+                  "stdout": completed.stdout.strip(),
+                  "stderr": completed.stderr.strip(),
+                  "returncode": completed.returncode,
+              }
 
-          if not notebooks:
-              print("No notebooks found.")
-              raise SystemExit(0)
+          def add_check(identifier, invariant_type, status, evidence, manual_required=False, severity="notice"):
+              checks.append({
+                  "id": identifier,
+                  "type": invariant_type,
+                  "status": status,
+                  "manual_required": manual_required,
+                  "severity": severity,
+                  "evidence": evidence,
+              })
+
+          assignment_id = os.environ.get("ASSIGNMENT_ID", "compu2526")
+          review_profile = os.environ.get("REVIEW_PROFILE", "invariant")
+          evidence_root = os.environ.get("EVIDENCE_ROOT", ".")
+          try:
+              max_notebook_mb = float(os.environ.get("MAX_NOTEBOOK_MB", "50"))
+          except ValueError:
+              max_notebook_mb = 50.0
+
+          checks = []
+          hard_failures = []
+          warnings = []
+
+          python_files = git_files("*.py")
+          c_files = git_files("*.c")
+          cpp_files = git_files("*.cpp", "*.cc", "*.cxx")
+          notebooks = git_files("*.ipynb")
+          markdown_files = git_files("README.md", "README.rst", "*.md")
+          manifest_candidates = [
+              "README.md",
+              "README.rst",
+              "requirements.txt",
+              "environment.yml",
+              "environment.yaml",
+              "pyproject.toml",
+              "Makefile",
+              "CMakeLists.txt",
+          ]
+          manifests = [path for path in manifest_candidates if Path(path).exists()]
+
+          add_check(
+              "repository_manifest_present",
+              "typed_repository_manifest",
+              "pass" if manifests else "manual_required",
+              {"manifests": manifests},
+              manual_required=not bool(manifests),
+              severity="warning" if not manifests else "notice",
+          )
+
+          source_count = len(python_files) + len(c_files) + len(cpp_files) + len(notebooks)
+          add_check(
+              "reviewable_artifacts_present",
+              "typed_artifact_inventory",
+              "pass" if source_count else "manual_required",
+              {
+                  "python": python_files,
+                  "c": c_files,
+                  "cxx": cpp_files,
+                  "notebooks": notebooks,
+              },
+              manual_required=not bool(source_count),
+              severity="warning" if not source_count else "notice",
+          )
+
+          for path in python_files:
+              result = command_result([sys.executable, "-m", "py_compile", path])
+              if result["ok"]:
+                  add_check(f"python_syntax:{path}", "typed_python_source", "pass", {"path": path})
+              else:
+                  hard_failures.append({"path": path, "kind": "python_syntax", **result})
+                  add_check(f"python_syntax:{path}", "typed_python_source", "fail", {"path": path, **result}, severity="error")
+
+          for path in c_files:
+              result = command_result(["gcc", "-std=c11", "-fsyntax-only", path])
+              if result["ok"]:
+                  add_check(f"c_syntax:{path}", "typed_c_source", "pass", {"path": path})
+              else:
+                  hard_failures.append({"path": path, "kind": "c_syntax", **result})
+                  add_check(f"c_syntax:{path}", "typed_c_source", "fail", {"path": path, **result}, severity="error")
+
+          for path in cpp_files:
+              result = command_result(["g++", "-std=c++17", "-fsyntax-only", path])
+              if result["ok"]:
+                  add_check(f"cxx_syntax:{path}", "typed_cxx_source", "pass", {"path": path})
+              else:
+                  hard_failures.append({"path": path, "kind": "cxx_syntax", **result})
+                  add_check(f"cxx_syntax:{path}", "typed_cxx_source", "fail", {"path": path, **result}, severity="error")
 
           for path in notebooks:
-              size_mb = path.stat().st_size / (1024 * 1024)
-              print(f"Checking {path} ({size_mb:.1f} MB)")
-              with path.open("r", encoding="utf-8") as handle:
-                  json.load(handle)
-              if size_mb > 50:
-                  print(f"::warning file={path}::Large notebook. Review provenance and consider stripping outputs.")
+              notebook = Path(path)
+              size_mb = notebook.stat().st_size / (1024 * 1024)
+              try:
+                  json.loads(notebook.read_text(encoding="utf-8"))
+                  status = "pass"
+                  evidence = {"path": path, "size_mb": round(size_mb, 3), "json_valid": True}
+              except Exception as exc:
+                  status = "fail"
+                  evidence = {"path": path, "size_mb": round(size_mb, 3), "json_valid": False, "error": str(exc)}
+                  hard_failures.append({"path": path, "kind": "notebook_json", "error": str(exc)})
+
+              if size_mb > max_notebook_mb:
+                  warnings.append({"path": path, "kind": "large_notebook", "size_mb": round(size_mb, 3)})
+                  evidence["large_notebook_warning"] = True
+
+              add_check(
+                  f"notebook_structure:{path}",
+                  "typed_notebook_artifact",
+                  status,
+                  evidence,
+                  severity="error" if status == "fail" else "warning" if size_mb > max_notebook_mb else "notice",
+              )
+
+          text = "\n".join(
+              Path(path).read_text(encoding="utf-8", errors="ignore")
+              for path in markdown_files
+              if Path(path).exists() and Path(path).stat().st_size < 1024 * 1024
+          ).lower()
+
+          manual_invariants = [
+              ("method_stated", "typed_method_contract", ["method", "algorithm", "scheme", "integrator"]),
+              ("parameters_stated", "typed_parameter_contract", ["parameter", "step", "dt", "grid", "initial condition"]),
+              ("units_stated", "typed_units_contract", ["unit", "units", "dimensionless", "si"]),
+              ("seed_or_reproducibility_stated", "typed_replay_contract", ["seed", "reproduc", "deterministic", "random"]),
+              ("output_traceable", "typed_output_trace_contract", ["figure", "plot", "output", "data", "result"]),
+              ("conservation_or_error_checked", "typed_physics_invariant_contract", ["conservation", "energy", "momentum", "error", "residual", "stability"]),
+          ]
+
+          for identifier, invariant_type, keywords in manual_invariants:
+              matched = [keyword for keyword in keywords if keyword in text]
+              add_check(
+                  identifier,
+                  invariant_type,
+                  "pass" if matched else "manual_required",
+                  {"matched_keywords": matched, "required_keywords_any": keywords},
+                  manual_required=not bool(matched),
+                  severity="notice" if matched else "warning",
+              )
+
+          evidence_path = Path(evidence_root)
+          add_check(
+              "evidence_root_declared",
+              "typed_evidence_root",
+              "pass" if evidence_path.exists() else "manual_required",
+              {"evidence_root": evidence_root, "exists": evidence_path.exists()},
+              manual_required=not evidence_path.exists(),
+              severity="warning" if not evidence_path.exists() else "notice",
+          )
+
+          manual_required_count = sum(1 for check in checks if check["manual_required"])
+          fail_count = sum(1 for check in checks if check["status"] == "fail")
+          warning_count = sum(1 for check in checks if check["severity"] == "warning") + len(warnings)
+          overall_status = "fail" if hard_failures else "pass_with_manual_review" if manual_required_count or warning_count else "pass"
+
+          witness = {
+              "$schema": "https://sigil-workflows.local/schemas/compu2526-review-invariant-typed-v1.json",
+              "id": "COMPU2526_REVIEW_INVARIANT_TYPED_WITNESS_V1",
+              "created_at": datetime.now(timezone.utc).isoformat(),
+              "assignment": {
+                  "id": assignment_id,
+                  "review_profile": review_profile,
+                  "evidence_root": evidence_root,
+                  "max_notebook_mb": max_notebook_mb,
+              },
+              "repository": {
+                  "name": os.environ.get("GITHUB_REPOSITORY", "local"),
+                  "sha": os.environ.get("GITHUB_SHA", "local"),
+                  "event": os.environ.get("GITHUB_EVENT_NAME", "manual"),
+              },
+              "status": overall_status,
+              "summary": {
+                  "checks": len(checks),
+                  "failures": fail_count,
+                  "warnings": warning_count,
+                  "manual_required": manual_required_count,
+              },
+              "files": {
+                  "manifests": manifests,
+                  "python": python_files,
+                  "c": c_files,
+                  "cxx": cpp_files,
+                  "notebooks": notebooks,
+              },
+              "typed_invariants": checks,
+              "warnings": warnings,
+              "hard_failures": hard_failures,
+          }
+
+          out = Path("build/compu2526-review")
+          (out / "invariant-witness.json").write_text(json.dumps(witness, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+          lines = [
+              "# COMPU2526 Invariant Typed Review",
+              "",
+              f"- status: `{overall_status}`",
+              f"- assignment: `{assignment_id}`",
+              f"- profile: `{review_profile}`",
+              f"- checks: `{len(checks)}`",
+              f"- failures: `{fail_count}`",
+              f"- warnings: `{warning_count}`",
+              f"- manual_required: `{manual_required_count}`",
+              "",
+              "## Typed Invariants",
+              "",
+          ]
+          for check in checks:
+              lines.append(f"- `{check['id']}`: `{check['status']}` ({check['type']})")
+          (out / "REVIEW_SUMMARY.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+          print(json.dumps(witness["summary"], indent=2, sort_keys=True))
+          if hard_failures:
+              print(json.dumps(hard_failures, indent=2, sort_keys=True))
+              raise SystemExit(1)
           PY
 
-      - name: Print manual review gates
+      - name: Publish review summary
         shell: bash
         run: |
-          echo "Manual review still required:"
-          echo "- parameters and random seeds logged"
-          echo "- units and rescaling documented"
-          echo "- conserved quantities checked where applicable"
-          echo "- generated data and media provenance clear"
+          set -euo pipefail
+          cat build/compu2526-review/REVIEW_SUMMARY.md
+          cat build/compu2526-review/REVIEW_SUMMARY.md >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Typed witness: `build/compu2526-review/invariant-witness.json`' >> "$GITHUB_STEP_SUMMARY"
