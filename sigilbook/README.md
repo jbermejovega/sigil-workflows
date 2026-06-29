@@ -26,6 +26,14 @@ The KQC rule rejects force transport, identity transport, secret transport,
 direct upstream mutation, branch topology as authority, private payloads, and
 unreviewed workflow installation.
 
+## COMPU2526 Review Invariant
+
+`COMPU2526_ASSIGNMENT_REVIEW_INVARIANT_V1` binds
+`ci/compu2526-review.yml` to this SigilBook KQC rule. It requires least-privilege
+read permissions, Python/C/C++/notebook smoke checks, and manual science-review
+trace terms while rejecting expensive simulations or notebook execution as
+default public review gates.
+
 ## Local Check
 
 ```bash
