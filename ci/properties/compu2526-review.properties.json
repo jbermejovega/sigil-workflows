@@ -1,0 +1,6 @@
+{
+    "name": "COMPU2526 assignment review",
+    "description": "Smoke-check computational physics assignments with Python, C/C++, and notebook review gates.",
+    "iconName": "octicon checklist",
+    "categories": ["Continuous integration", "Python", "C", "C++", "Jupyter Notebook", "Education"]
+}
