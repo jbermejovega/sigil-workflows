@@ -1,0 +1,113 @@
+# This workflow smoke-checks computational physics assignment repositories.
+# It validates source syntax and notebook structure without rerunning expensive simulations.
+
+name: COMPU2526 review
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+
+permissions:
+  contents: read
+
+jobs:
+  review-smoke:
+    name: Assignment smoke checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Report repository manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in README.md requirements.txt environment.yml environment.yaml pyproject.toml Makefile CMakeLists.txt; do
+            if [ -f "$file" ]; then
+              echo "Found $file"
+            else
+              echo "::notice::$file not found"
+            fi
+          done
+
+      - name: Check Python syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(git ls-files '*.py' -z)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Python files found."
+          else
+            python -m py_compile "${files[@]}"
+          fi
+
+      - name: Check C syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(git ls-files '*.c' -z)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No C files found."
+          else
+            for file in "${files[@]}"; do
+              echo "Checking $file"
+              gcc -std=c11 -fsyntax-only "$file"
+            done
+          fi
+
+      - name: Check C++ syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(git ls-files '*.cpp' -z)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No C++ files found."
+          else
+            for file in "${files[@]}"; do
+              echo "Checking $file"
+              g++ -std=c++17 -fsyntax-only "$file"
+            done
+          fi
+
+      - name: Check notebooks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+
+          notebooks = [Path(path) for path in subprocess.check_output(
+              ["git", "ls-files", "*.ipynb"], text=True
+          ).splitlines()]
+
+          if not notebooks:
+              print("No notebooks found.")
+              raise SystemExit(0)
+
+          for path in notebooks:
+              size_mb = path.stat().st_size / (1024 * 1024)
+              print(f"Checking {path} ({size_mb:.1f} MB)")
+              with path.open("r", encoding="utf-8") as handle:
+                  json.load(handle)
+              if size_mb > 50:
+                  print(f"::warning file={path}::Large notebook. Review provenance and consider stripping outputs.")
+          PY
+
+      - name: Print manual review gates
+        shell: bash
+        run: |
+          echo "Manual review still required:"
+          echo "- parameters and random seeds logged"
+          echo "- units and rescaling documented"
+          echo "- conserved quantities checked where applicable"
+          echo "- generated data and media provenance clear"
