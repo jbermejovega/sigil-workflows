@@ -1,0 +1,123 @@
+# KQC guard for SIGILBOOK-style repositories.
+# It checks that public changes preserve explicit trace and certificate markers.
+
+name: SIGILBOOK KQC Rule
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kqc-rule:
+    name: KQC trace and certificate gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate SIGILBOOK KQC markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          TRACKED_SUFFIXES = {
+              ".md",
+              ".txt",
+              ".yml",
+              ".yaml",
+              ".json",
+              ".jsonl",
+              ".toml",
+          }
+
+          def tracked_files():
+              output = subprocess.check_output(["git", "ls-files"], text=True)
+              for raw in output.splitlines():
+                  path = Path(raw)
+                  if path.suffix.lower() in TRACKED_SUFFIXES:
+                      yield path
+
+          files = list(tracked_files())
+          if not files:
+              print("::error title=KQC source missing::No tracked text, manifest, or trace files found.")
+              raise SystemExit(1)
+
+          corpus_parts = []
+          parse_errors = []
+          for path in files:
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  print(f"::notice file={path}::Skipping non-UTF-8 tracked file.")
+                  continue
+
+              corpus_parts.append(text.lower())
+
+              if path.suffix.lower() == ".json":
+                  try:
+                      json.loads(text)
+                  except json.JSONDecodeError as exc:
+                      parse_errors.append(f"{path}: {exc}")
+
+              if path.suffix.lower() == ".jsonl":
+                  for line_number, line in enumerate(text.splitlines(), 1):
+                      stripped = line.strip()
+                      if not stripped:
+                          continue
+                      try:
+                          json.loads(stripped)
+                      except json.JSONDecodeError as exc:
+                          parse_errors.append(f"{path}:{line_number}: {exc}")
+
+          if parse_errors:
+              for item in parse_errors:
+                  print(f"::error title=KQC parse failure::{item}")
+              raise SystemExit(1)
+
+          corpus = "\n".join(corpus_parts)
+          checks = {
+              "sigilbook": "sigilbook" in corpus,
+              "kqc": "kqc" in corpus,
+              "trace": "trace" in corpus or "synk" in corpus,
+              "certificate": "certificate" in corpus or "proof_gate" in corpus,
+              "no_transport": "no transport" in corpus or "no_transport" in corpus,
+          }
+
+          missing = [name for name, ok in checks.items() if not ok]
+          if missing:
+              print("::error title=KQC markers missing::Missing required markers: " + ", ".join(missing))
+              print("Expected a public SIGILBOOK rule surface that names SIGILBOOK, KQC, trace/SYNK, certificate/PROOF_GATE, and no transport.")
+              raise SystemExit(1)
+
+          print("SIGILBOOK KQC Rule passed.")
+          for name in checks:
+              print(f"- {name}: present")
+          PY
+
+      - name: Print KQC release guard
+        shell: bash
+        run: |
+          cat <<'KQC'
+          KQC guard:
+          - no trace => no authority
+          - no certificate => no release
+          - no transport
+          - public workflow sharing requires explicit source and witness
+          KQC

@@ -1,0 +1,7 @@
+{
+    "name": "SIGILBOOK KQC Rule",
+    "description": "Validate SIGILBOOK trace, certificate, and no-transport markers for public workflow sharing.",
+    "iconName": "octicon shield-check",
+    "creator": "jbermejovega",
+    "categories": ["Continuous integration", "code-quality", "code-review", "YAML", "JSON", "Markdown"]
+}
