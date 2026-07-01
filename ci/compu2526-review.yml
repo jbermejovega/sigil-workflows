@@ -1,5 +1,5 @@
 # This workflow smoke-checks computational physics assignment repositories.
-# It validates source syntax and notebook structure without rerunning expensive simulations.
+# It validates source syntax, notebook structure, and typed review invariants without rerunning expensive simulations.
 
 name: COMPU2526 review
 
@@ -37,6 +37,240 @@ jobs:
               echo "::notice::$file not found"
             fi
           done
+
+      - name: Emit typed invariant report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .compu2526-review
+          python - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+          from pathlib import Path
+
+          raw_files = subprocess.check_output(["git", "ls-files", "-z"])
+          files = [Path(item.decode("utf-8", "replace")) for item in raw_files.split(b"\0") if item]
+
+          source_suffixes = {".py", ".c", ".cc", ".cpp", ".h", ".hpp", ".f", ".f90", ".f95"}
+          report_suffixes = {".md", ".pdf", ".tex"}
+          data_suffixes = {".csv", ".dat", ".json", ".npy", ".npz", ".txt", ".tsv"}
+          media_suffixes = {".gif", ".jpg", ".jpeg", ".mp4", ".png", ".svg", ".webm"}
+          manifest_names = {"README.md", "requirements.txt", "environment.yml", "environment.yaml", "pyproject.toml", "Makefile", "CMakeLists.txt"}
+
+          notebooks = [path for path in files if path.suffix.lower() == ".ipynb"]
+          sources = [path for path in files if path.suffix.lower() in source_suffixes]
+          reports = [path for path in files if path.suffix.lower() in report_suffixes]
+          data_files = [path for path in files if path.suffix.lower() in data_suffixes]
+          media_files = [path for path in files if path.suffix.lower() in media_suffixes]
+          manifests = [path for path in files if path.name in manifest_names]
+
+          notebook_summaries = []
+          invalid_notebooks = []
+          corpus_parts = []
+
+          for path in notebooks:
+              summary = {
+                  "path": str(path),
+                  "valid_json": False,
+                  "cells": 0,
+                  "markdown_cells": 0,
+                  "code_cells": 0,
+                  "output_cells": 0,
+              }
+              try:
+                  with path.open("r", encoding="utf-8") as handle:
+                      notebook = json.load(handle)
+                  summary["valid_json"] = True
+                  cells = notebook.get("cells", [])
+                  summary["cells"] = len(cells)
+                  for cell in cells:
+                      source = cell.get("source", "")
+                      if isinstance(source, list):
+                          source = "".join(source)
+                      corpus_parts.append(source.lower())
+                      cell_type = cell.get("cell_type")
+                      if cell_type == "markdown":
+                          summary["markdown_cells"] += 1
+                      elif cell_type == "code":
+                          summary["code_cells"] += 1
+                          if cell.get("outputs"):
+                              summary["output_cells"] += 1
+              except Exception as exc:
+                  summary["error"] = str(exc)
+                  invalid_notebooks.append(str(path))
+              notebook_summaries.append(summary)
+
+          def read_small_text(path, limit=200_000):
+              try:
+                  data = path.read_bytes()[:limit]
+              except Exception:
+                  return ""
+              return data.decode("utf-8", "ignore").lower()
+
+          for path in sources + [p for p in reports if p.suffix.lower() in {".md", ".tex"}]:
+              corpus_parts.append(read_small_text(path))
+
+          corpus = "\n".join(corpus_parts)
+          kernel_patterns = {
+              "verlet_or_symplectic": r"\bverlet\b|\bsymplectic\b",
+              "metropolis_monte_carlo": r"\bmetropolis\b|\bmonte[\s_-]?carlo\b",
+              "ising": r"\bising\b",
+              "crank_nicolson": r"\bcrank[\s_-]?(nicolson|nicholson)\b|\btridiagonal\b",
+              "runge_kutta_or_rk4": r"\brunge[\s_-]?kutta\b|\brk4\b",
+              "hopfield": r"\bhopfield\b",
+              "kawasaki": r"\bkawasaki\b",
+              "schrodinger": r"\bschro?dinger\b|\bschr\b",
+              "n_body_or_gravity": r"\bn[\s_-]?body\b|\bgravit",
+              "finite_size_scaling": r"finite[\s_-]?size|tamano[\s_-]?finito",
+              "numba_mpi_or_hpc": r"\bnumba\b|\bjit\b|\bmpi\b|\bhpc\b|\bproteus\b",
+          }
+          kernel_signals = sorted(name for name, pattern in kernel_patterns.items() if re.search(pattern, corpus))
+
+          def invariant(layer, name, status, evidence, review_effect):
+              return {
+                  "layer": layer,
+                  "name": name,
+                  "status": status,
+                  "evidence": evidence,
+                  "review_effect": review_effect,
+              }
+
+          review_surface_count = len(notebooks) + len(sources) + len(reports)
+          invariants = [
+              invariant(
+                  "holonmic",
+                  "review_surface_exists",
+                  "pass" if review_surface_count else "fail",
+                  f"notebooks={len(notebooks)}, sources={len(sources)}, reports={len(reports)}",
+                  "Repository contains at least one reviewable assignment artifact.",
+              ),
+              invariant(
+                  "holonmic",
+                  "artifact_types_partitioned",
+                  "pass",
+                  f"data={len(data_files)}, media={len(media_files)}, manifests={len(manifests)}",
+                  "Artifacts are counted by typed role before human grading.",
+              ),
+              invariant(
+                  "semiotic",
+                  "notebook_json_validity",
+                  "pass" if not invalid_notebooks else "fail",
+                  ", ".join(invalid_notebooks) if invalid_notebooks else f"valid_notebooks={len(notebooks)}",
+                  "Invalid notebooks break evidence extraction and must be fixed before review.",
+              ),
+              invariant(
+                  "semiotic",
+                  "trace_manifest_present",
+                  "pass" if manifests else "warn",
+                  ", ".join(str(path) for path in manifests) if manifests else "No README/build/environment manifest found.",
+                  "Manifest evidence helps replay code paths, parameters, and dependencies.",
+              ),
+              invariant(
+                  "semantic",
+                  "canonical_kernel_signal_detected",
+                  "pass" if kernel_signals else "warn",
+                  ", ".join(kernel_signals) if kernel_signals else "No canonical computational-physics kernel words detected.",
+                  "Signals route the repo to the appropriate human scientific review gates.",
+              ),
+              invariant(
+                  "reproducibility",
+                  "execution_environment_hint_present",
+                  "pass" if any(path.name in {"requirements.txt", "environment.yml", "environment.yaml", "pyproject.toml", "Makefile", "CMakeLists.txt"} for path in manifests) else "warn",
+                  ", ".join(str(path) for path in manifests) if manifests else "No environment or build file found.",
+                  "Environment hints reduce ambiguity but do not replace execution review.",
+              ),
+              invariant(
+                  "review",
+                  "manual_scientific_review_required",
+                  "manual",
+                  "seeds, units, conserved quantities, generated artifact provenance",
+                  "The workflow cannot certify physics correctness or assign grades automatically.",
+              ),
+          ]
+
+          report = {
+              "schema": "compu2526.typed_invariants.v1",
+              "repository": os.environ.get("GITHUB_REPOSITORY", ""),
+              "ref": os.environ.get("GITHUB_REF", ""),
+              "sha": os.environ.get("GITHUB_SHA", ""),
+              "counts": {
+                  "tracked_files": len(files),
+                  "notebooks": len(notebooks),
+                  "source_files": len(sources),
+                  "reports": len(reports),
+                  "data_files": len(data_files),
+                  "media_files": len(media_files),
+                  "manifests": len(manifests),
+              },
+              "kernel_signals": kernel_signals,
+              "notebooks": notebook_summaries,
+              "invariants": invariants,
+          }
+
+          out_dir = Path(".compu2526-review")
+          json_path = out_dir / "typed-invariants.json"
+          md_path = out_dir / "typed-invariants.md"
+          json_path.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+
+          def md_escape(value):
+              return str(value).replace("|", "\\|").replace("\n", " ")
+
+          lines = [
+              "# COMPU2526 typed invariant report",
+              "",
+              f"Repository: `{report['repository']}`",
+              f"SHA: `{report['sha']}`",
+              "",
+              "## Counts",
+              "",
+          ]
+          for key, value in report["counts"].items():
+              lines.append(f"- `{key}`: {value}")
+          lines.extend([
+              "",
+              "## Invariants",
+              "",
+              "| Layer | Invariant | Status | Evidence |",
+              "|---|---|---|---|",
+          ])
+          for item in invariants:
+              lines.append(
+                  f"| {md_escape(item['layer'])} | {md_escape(item['name'])} | {md_escape(item['status'])} | {md_escape(item['evidence'])} |"
+              )
+          lines.extend([
+              "",
+              "## Kernel Signals",
+              "",
+              ", ".join(kernel_signals) if kernel_signals else "No canonical kernel signal detected.",
+              "",
+              "Manual grading still requires physics, numerical-method, and reproducibility review.",
+          ])
+          markdown = "\n".join(lines) + "\n"
+          md_path.write_text(markdown, encoding="utf-8")
+
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a", encoding="utf-8") as handle:
+                  handle.write(markdown)
+          PY
+
+      - name: Enforce typed structural invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path(".compu2526-review/typed-invariants.json").read_text(encoding="utf-8"))
+          failures = [item for item in report["invariants"] if item["status"] == "fail"]
+          for item in failures:
+              print(f"::error::{item['layer']}.{item['name']}: {item['evidence']}")
+          if failures:
+              raise SystemExit(1)
+          PY
 
       - name: Check Python syntax
         shell: bash
@@ -103,7 +337,16 @@ jobs:
                   print(f"::warning file={path}::Large notebook. Review provenance and consider stripping outputs.")
           PY
 
+      - name: Upload typed invariant report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compu2526-typed-invariants
+          path: .compu2526-review/
+          if-no-files-found: ignore
+
       - name: Print manual review gates
+        if: always()
         shell: bash
         run: |
           echo "Manual review still required:"
@@ -111,3 +354,4 @@ jobs:
           echo "- units and rescaling documented"
           echo "- conserved quantities checked where applicable"
           echo "- generated data and media provenance clear"
+          echo "- typed invariant warnings reviewed against the assignment HyperDAG"
