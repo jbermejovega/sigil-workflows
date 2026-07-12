@@ -1,0 +1,56 @@
+schema_version: sigil.cross_repo.workflow_package_descriptor.v1
+id: KINKSAWAKENING_PACA_SIGIL_EXECUTION_ONTOLOGY_TOPOLOGY_KINETICS_ATLAS_V1_SIGIL_WORKFLOWS
+version: 1.0.0
+repository: jbermejovega/sigil-workflows
+role: control_plane
+status: review_only_package_descriptor
+canonical_source:
+  repository: jbermejovega/sigilbook
+  immutable_ref: 3a69e5d943c8907de64a82e765c706c187d004f5
+  pull_request: 272
+  registry_path: registry/kinksawakening_paca_sigil_execution_ontology_topology_kinetics_atlas_v1.yaml
+  rag_path: resources/rag/kinksawakening_paca_sigil_execution_ontology_topology_kinetics_atlas_v1.yaml
+  mcp_path: mcp/kinksawakening-paca-sigil-execution-ontology-topology-kinetics-atlas-v1.yaml
+  n8n_plan_path: integrations/n8n/kinksawakening_paca_sigil_execution_ontology_topology_kinetics_activation_plan_v1.json
+  witness_path: witness/KINKSAWAKENING_PACA_SIGIL_EXECUTION_ONTOLOGY_TOPOLOGY_KINETICS_ATLAS_V1.safe_replay.jsonl
+  source_sha256: b2a10771a870acc77487823edea8ad824691e461ddb8c45398f08b2bffb5644b
+  trace_id: b37e231600e5d8619881d302dfa3b7bf1b9a9c3a27568d8e8e9f0d8cf6f8212d
+policy:
+  local_policy: docs/policy/SYNTHGOTHHUB_RAG_MCP_N8N_COMPLIANCE_V1.md
+  branch: policy/rag-mcp-n8n-compliance-v1
+  draft_pr: 12
+  no_direct_main_mutation: true
+package_gates:
+  schema_versioned: true
+  fixtures_required_before_implementation: true
+  failure_fixtures_required:
+  - digest_mismatch
+  - missing_rights_descriptor
+  - mutable_ref
+  - pysheaf_claim_inflation
+  - witness_signature_claim_inflation
+  - hidden_tool_invocation
+  - stable_diffusion_without_generation_metadata
+  - sonic_pi_autoplay
+  credentials_policy_required: true
+  replay_metadata_required: true
+  rollback_plan_required: true
+  promotion_requires_human_review: true
+  implementation_claimed: false
+projection_contract:
+  QUASARPI: typed_derivative_fixture_only
+  QUNOS: namespace_fixture_only
+  MIMBREPI: typed_derivative_fixture_only
+  LAURELPI: closure_candidate_fixture_only
+  STABLE_DIFFUSION: generation_fixture_not_present
+  SONIC_PI_LIVECODE: session_fixture_not_present
+  KUIRKODE: lint_fixture_only
+invariants:
+- PIORNALEGO_ES_CANON
+- SAFE_REPLAY
+- TRACE_PRESERVED
+- PI_FIXED_REQUIRED
+- NO_IDENTITY_TRANSPORT
+- PROVENANCE_APPEND_ONLY
+- LICENSE_PRESERVED
+- CLAIMS_MATCH_WITNESSES
