@@ -1,0 +1,93 @@
+id: SYNTHGOTHHUB_KINKSAWAKENING_PLURAL_PI_ADAPTER_V1
+version: 1.0.0
+kind: repository_projection_policy
+status: draft_pr_gated
+repository: jbermejovega/sigil-workflows
+role: reusable_workflow_package_registry
+branch: policy/rag-mcp-n8n-compliance-v1
+pull_request: 12
+
+authority:
+  canonical_repository: jbermejovega/sigilbook
+  canonical_policy: docs/policy/SYNTHGOTHHUB_RAG_MCP_N8N_COMPLIANCE_V1.md
+  canonical_resource: resources/rag/synthgothhub_kinksawakening_plural_pi_resource_v1.yaml
+  local_code_truth: git_history
+  workflow_registry_is_not_authority: true
+
+rag:
+  mode: source_bound
+  provenance_required: true
+  immutable_ref_path_and_hash_required: true
+  license_or_usage_descriptor_required: true
+  retrieval_is_not_truth: true
+  conflicts_remain_plural: true
+
+mcp:
+  mode: bounded_read_and_plan
+  mutation: false
+  repository_writes: false
+  external_execution: false
+
+workflow_package:
+  active_by_default: false
+  credentials_embedded: false
+  required:
+    - workflow_export_or_descriptor
+    - schema_version
+    - fixture_inputs
+    - expected_outputs
+    - failure_fixture
+    - provenance_contract
+    - replay_metadata
+    - credential_policy
+    - rollback_or_disable_path
+  promotion_requires:
+    - schema_valid
+    - fixture_tested
+    - failure_tested
+    - replayable
+    - reviewed
+  execution_claimed: false
+
+n8n:
+  role: orchestration_descriptor_only
+  repository_mutation: false
+  stable_diffusion_execution: false
+  sonic_pi_audio_playback: false
+  merge: false
+  release: false
+  deployment: false
+
+typed_sections:
+  - QuasarPi
+  - PluralTyped
+  - QunoTypes
+  - MimbrePi
+  - LaurelPi
+  - StableDiffusion
+  - SonicPi
+  - Kuirkode
+
+aliases:
+  qunos: QunoTypes
+  stablediffussion: StableDiffusion
+  sonicpi: SonicPi
+  kuirkode: Kuirkode
+
+invariants:
+  - PIORNALEGO_ES_CANON
+  - SAFE_REPLAY
+  - TRACE_PRESERVED
+  - PI_FIXED
+  - NO_IDENTITY_TRANSPORT
+  - NO_IDENTITY_COLLAPSE
+  - NO_PLURAL_COLLAPSE
+  - LICENSE_PRESERVED
+  - HUMAN_REVIEW_REQUIRED
+
+claim_boundary:
+  policy_declared: true
+  descriptor_exported: false
+  workflow_executed: false
+  production_candidate: false
+  canonicalized: false
