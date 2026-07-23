@@ -1,0 +1,4 @@
+status: active
+canonical_orchestrator: QUAZRIS8
+validator: PYDANTIKA
+legacy_n8n: migration_only
