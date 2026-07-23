@@ -1,0 +1,14 @@
+id: PYDANTIKA_QUAZRIS8_GATE_SCHEMA_V1
+status: canonical_candidate
+validator: PYDANTIKA
+orchestrator: QUAZRIS8
+legacy_adapter: n8n
+gates:
+  - Q1_PROBE
+  - Q2_DECLARE
+  - Q3_TYPE
+  - Q4_BOUND
+  - Q5_EXECUTE
+  - Q6_TRACE
+  - Q7_VERIFY
+  - Q8_CLOSE
