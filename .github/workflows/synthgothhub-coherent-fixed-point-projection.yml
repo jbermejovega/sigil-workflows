@@ -1,0 +1,75 @@
+name: SynthGothHub Coherent Fixed Point Projection
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/synthgothhub-coherent-fixed-point-projection.yml"
+      - "scripts/validate_synthgothhub_projection.py"
+      - "tests/test_synthgothhub_projection.py"
+      - "projections/SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1.sigil"
+      - "policies/synthgothhub-coherent-fixed-point-v1.json"
+      - "docs/SYNTHGOTHHUB_COHERENT_WORKFLOW_PROJECTION_V1.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: synthgothhub-coherent-workflow-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-read-only-projection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Compile dependency-free validator
+        run: |
+          python -m py_compile \
+            scripts/validate_synthgothhub_projection.py \
+            tests/test_synthgothhub_projection.py
+
+      - name: Run focused projection tests
+        env:
+          PYTHONPATH: .
+        run: python tests/test_synthgothhub_projection.py
+
+      - name: Validate projection and policy
+        run: |
+          python scripts/validate_synthgothhub_projection.py > /tmp/receipt.json
+          python -m json.tool /tmp/receipt.json >/dev/null
+          python - <<'PY'
+          import json
+          receipt = json.load(open('/tmp/receipt.json', encoding='utf-8'))
+          assert receipt['state'] == 'ADMIT'
+          assert receipt['runtime_executed'] is False
+          assert receipt['repository_mutated'] is False
+          assert receipt['final_kapsyla'] is False
+          PY
+
+      - name: Verify exact terminal end line
+        run: |
+          PROJECTION=projections/SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1.sigil
+          tail -n 1 "$PROJECTION" | grep -Fx \
+            'end SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1'
+          test "$(grep -Fxc 'end SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1' "$PROJECTION")" = 1
+
+      - name: Enforce read-only workflow boundary
+        run: |
+          ! grep -REn \
+            'git push|gh pr merge|pull_request_target:|permissions:.*write|id-token: write' \
+            scripts/validate_synthgothhub_projection.py \
+            projections/SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1.sigil \
+            .github/workflows/synthgothhub-coherent-fixed-point-projection.yml
