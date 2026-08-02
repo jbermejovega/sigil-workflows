@@ -2,8 +2,8 @@
 
 **Author/owner:** Jara Juana Bermejo-Vega / JJBV  
 **Canonical source:** `jbermejovega/sigilbook` PR #695 payload `3eaa72173eba1f91627c80b5e8359adeb140994e`  
-**CPython projection:** `jbermejovega/sigil4cpython` PR #8 head `965c440211b9e2dcd94af492aca138fbcdba76fd`  
-**Aesthetik projection:** `jbermejovega/universal-abstrakta-plural-aesthetik` PR #20 head `3ab68d672ca8cbee3620ec9c71dd96aafd8fff0b`  
+**CPython projection:** `jbermejovega/sigil4cpython` PR #8 head `a422e2622895dd94193340173942f0e075a5891a`  
+**Aesthetik projection:** `jbermejovega/universal-abstrakta-plural-aesthetik` PR #20 head `09598fb67ba92883b4bd0ca35b6681253073db73`  
 **Canon:** `PIORNALEGO_ES_CANON`
 
 ## Scope
