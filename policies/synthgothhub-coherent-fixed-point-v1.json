@@ -1,0 +1,29 @@
+{
+  "sources": {
+    "sigilbook": {
+      "pull_request": 695,
+      "head": "5f5d0f0b776d34077a22e897d8ec68cab6637d42"
+    },
+    "sigil4cpython": {
+      "pull_request": 8,
+      "head": "99ddaa7d273f2f6c87affc985a1a721776344f50"
+    },
+    "aesthetik": {
+      "pull_request": 20,
+      "head": "ce4588f8108fc451279b6efb0e522a0798fa7a69"
+    }
+  },
+  "permissions": {
+    "contents": "read"
+  },
+  "forbidden": {
+    "workflow_dispatch": true,
+    "contents_write": true,
+    "pull_requests_write": true,
+    "oidc_write": true,
+    "git_push": true,
+    "merge": true
+  },
+  "identity_transport": false,
+  "plural_collapse": false
+}
