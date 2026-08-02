@@ -1,9 +1,9 @@
 # SYNTHGOTHHUB_COHERENT_WORKFLOW_PROJECTION_V1
 
 **Author/owner:** Jara Juana Bermejo-Vega / JJBV  
-**Canonical source:** `jbermejovega/sigilbook` PR #695 payload `5f5d0f0b776d34077a22e897d8ec68cab6637d42`  
-**CPython projection:** `jbermejovega/sigil4cpython` PR #8 head `99ddaa7d273f2f6c87affc985a1a721776344f50`  
-**Aesthetik projection:** `jbermejovega/universal-abstrakta-plural-aesthetik` PR #20 head `ce4588f8108fc451279b6efb0e522a0798fa7a69`  
+**Canonical source:** `jbermejovega/sigilbook` PR #695 payload `3eaa72173eba1f91627c80b5e8359adeb140994e`  
+**CPython projection:** `jbermejovega/sigil4cpython` PR #8 head `e290a2221bbda62ded17ec3d0b9b298a45da8223`  
+**Aesthetik projection:** `jbermejovega/universal-abstrakta-plural-aesthetik` PR #20 head `fee252248b711fb718257e65530668661a81ec5d`  
 **Canon:** `PIORNALEGO_ES_CANON`
 
 ## Scope
