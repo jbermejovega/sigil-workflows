@@ -2,8 +2,8 @@
 
 **Author/owner:** Jara Juana Bermejo-Vega / JJBV  
 **Canonical source:** `jbermejovega/sigilbook` PR #695 payload `3eaa72173eba1f91627c80b5e8359adeb140994e`  
-**CPython projection:** `jbermejovega/sigil4cpython` PR #8 head `e290a2221bbda62ded17ec3d0b9b298a45da8223`  
-**Aesthetik projection:** `jbermejovega/universal-abstrakta-plural-aesthetik` PR #20 head `fee252248b711fb718257e65530668661a81ec5d`  
+**CPython projection:** `jbermejovega/sigil4cpython` PR #8 head `68978af47a80fdde8a4882579dde28f5c3b5c92f`  
+**Aesthetik projection:** `jbermejovega/universal-abstrakta-plural-aesthetik` PR #20 head `ab4b50a3cc69691a75a1ff66fda2dbe155d3e43a`  
 **Canon:** `PIORNALEGO_ES_CANON`
 
 ## Scope
@@ -66,7 +66,8 @@ repository_mutated: false
 final_kapsyla: false
 ```
 
-The hosted workflow is intentionally read-only and contains no
+The hosted workflow is intentionally read-only, uses SHA-pinned checkout and
+setup actions, disables persisted checkout credentials, and contains no
 `workflow_dispatch` trigger. Hosted validation is not claimed green until
 GitHub Actions actually executes it.
 
