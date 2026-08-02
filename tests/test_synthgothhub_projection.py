@@ -9,7 +9,7 @@ from scripts.validate_synthgothhub_projection import (
 
 DOCUMENT = """projection SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1
 author Jara Juana Bermejo-Vega / JJBV
-source sigilbook#695@5f5d0f0b776d34077a22e897d8ec68cab6637d42
+source sigilbook#695@3eaa72173eba1f91627c80b5e8359adeb140994e
 target jbermejovega/sigil-workflows
 section SECTION_SIGIL_WORKFLOWS_PUBLIC
 kernel SIGIL_PLURAL_UNIVERSAL_ABSTRAKTA_AESTHETIK_KERNEL_V1
@@ -25,15 +25,15 @@ POLICY = {
     "sources": {
         "sigilbook": {
             "pull_request": 695,
-            "head": "5f5d0f0b776d34077a22e897d8ec68cab6637d42",
+            "head": "3eaa72173eba1f91627c80b5e8359adeb140994e",
         },
         "sigil4cpython": {
             "pull_request": 8,
-            "head": "99ddaa7d273f2f6c87affc985a1a721776344f50",
+            "head": "e290a2221bbda62ded17ec3d0b9b298a45da8223",
         },
         "aesthetik": {
             "pull_request": 20,
-            "head": "ce4588f8108fc451279b6efb0e522a0798fa7a69",
+            "head": "fee252248b711fb718257e65530668661a81ec5d",
         },
     },
     "permissions": {"contents": "read"},
