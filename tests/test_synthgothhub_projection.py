@@ -29,11 +29,11 @@ POLICY = {
         },
         "sigil4cpython": {
             "pull_request": 8,
-            "head": "965c440211b9e2dcd94af492aca138fbcdba76fd",
+            "head": "a422e2622895dd94193340173942f0e075a5891a",
         },
         "aesthetik": {
             "pull_request": 20,
-            "head": "3ab68d672ca8cbee3620ec9c71dd96aafd8fff0b",
+            "head": "09598fb67ba92883b4bd0ca35b6681253073db73",
         },
     },
     "permissions": {"contents": "read"},
