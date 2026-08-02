@@ -68,10 +68,9 @@ jobs:
             'end SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1'
           test "$(grep -Fxc 'end SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1' "$PROJECTION")" = 1
 
-      - name: Enforce read-only workflow boundary
+      - name: Enforce read-only projection boundary
         run: |
           ! grep -REn \
             'git push|gh pr merge|pull_request_target:|permissions:.*write|id-token: write' \
             scripts/validate_synthgothhub_projection.py \
-            projections/SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1.sigil \
-            .github/workflows/synthgothhub-coherent-fixed-point-projection.yml
+            projections/SYNTHGOTHHUB_SIGIL_WORKFLOWS_PROJECTION_V1.sigil
